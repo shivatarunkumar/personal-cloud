@@ -1,0 +1,146 @@
+@import "tailwindcss";
+
+/* Every colour is a token: components never name a colour, so light and dark both follow
+   from here. A calm sky-blue brand on clean surfaces, with warm folder yellow. */
+:root {
+  color-scheme: light;
+  --bg: #ffffff;
+  --surface: #f3f6fa;
+  --surface-hover: #e8eef6;
+  --selected: #dcebfb;
+  --text: #13202e;
+  --muted: #5b6b7c;
+  --border: #dde4ec;
+  --brand: #1f6fd1;
+  --brand-hover: #185bb0;
+  --brand-contrast: #ffffff;
+  --ok: #17794f;
+  --warn: #a2660f;
+  --bad: #c0392b;
+  --folder: #e4a817;
+  --k-image: #d9480f;
+  --k-video: #9c36b5;
+  --k-audio: #0c8599;
+  --k-pdf: #c92a2a;
+  --k-text: #495057;
+  --k-archive: #8d6e3f;
+  --k-document: #1f6fd1;
+  --k-other: #6b7785;
+  --scrim: rgb(9 14 20 / 0.55);
+}
+
+/* Dark mode comes from the OS unless someone picks a theme: the toggle sets data-theme on
+   <html>, and the layout renders the saved choice from a cookie, so there is no flash.
+   The two blocks below must hold the same tokens: one for "auto", one for "always dark". */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0e141b;
+    --surface: #151d27;
+    --surface-hover: #1c2733;
+    --selected: #1b3350;
+    --text: #e6edf4;
+    --muted: #93a3b4;
+    --border: #243140;
+    --brand: #5aa2f0;
+    --brand-hover: #82baf5;
+    --brand-contrast: #06121f;
+    --ok: #58c08a;
+    --warn: #d8a34a;
+    --bad: #ec7a6d;
+    --folder: #f0bf45;
+    --k-image: #ff8c5a;
+    --k-video: #d38ce6;
+    --k-audio: #4fc3d4;
+    --k-pdf: #f07171;
+    --k-text: #b7c0c9;
+    --k-archive: #c9a26b;
+    --k-document: #5aa2f0;
+    --k-other: #93a3b4;
+    --scrim: rgb(0 0 0 / 0.7);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0e141b;
+  --surface: #151d27;
+  --surface-hover: #1c2733;
+  --selected: #1b3350;
+  --text: #e6edf4;
+  --muted: #93a3b4;
+  --border: #243140;
+  --brand: #5aa2f0;
+  --brand-hover: #82baf5;
+  --brand-contrast: #06121f;
+  --ok: #58c08a;
+  --warn: #d8a34a;
+  --bad: #ec7a6d;
+  --folder: #f0bf45;
+  --k-image: #ff8c5a;
+  --k-video: #d38ce6;
+  --k-audio: #4fc3d4;
+  --k-pdf: #f07171;
+  --k-text: #b7c0c9;
+  --k-archive: #c9a26b;
+  --k-document: #5aa2f0;
+  --k-other: #93a3b4;
+  --scrim: rgb(0 0 0 / 0.7);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-selected: var(--selected);
+  --color-fg: var(--text);
+  --color-muted: var(--muted);
+  --color-line: var(--border);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-contrast: var(--brand-contrast);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+  --color-folder: var(--folder);
+  --color-scrim: var(--scrim);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Upload progress: a sheen travelling along the bar, so a slow upload visibly feels alive. */
+@keyframes pc-sheen {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.upload-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.45), transparent);
+  animation: pc-sheen 1.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .upload-sheen::after {
+    animation: none;
+  }
+}
