@@ -216,3 +216,20 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Personal Cloud
+logs/
+node_modules/
+.next/
+*.tsbuildinfo
+next-env.d.ts
+.ruff_cache/
+# service-account keys never belong in the repo
+*-key.json
+service-account*.json
+.idea/
+.vscode/
+.DS_Store
+
+# local diagram builds (receipts contain absolute local paths)
+.archify/
