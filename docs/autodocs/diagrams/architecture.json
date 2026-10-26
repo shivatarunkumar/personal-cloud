@@ -1,0 +1,302 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Personal Cloud — runtime architecture",
+    "output": "docs/autodocs/diagrams/architecture.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "browser",
+      "type": "external",
+      "label": "Browser",
+      "sublabel": "React UI · chunk uploader",
+      "pos": [
+        40,
+        240
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "caddy",
+      "type": "cloud",
+      "label": "Caddy",
+      "sublabel": ":80 name → port (optional)",
+      "pos": [
+        270,
+        240
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "Next.js web app",
+      "sublabel": ":3002 pages + /api proxy",
+      "pos": [
+        520,
+        240
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "FastAPI",
+      "sublabel": ":8002 routes · streaming",
+      "pos": [
+        790,
+        240
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "auth",
+      "type": "security",
+      "label": "Auth & sessions",
+      "sublabel": "argon2id · JWT cookies",
+      "pos": [
+        790,
+        90
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "drive",
+      "type": "backend",
+      "label": "Drive service",
+      "sublabel": "folders · trash · bucket sync",
+      "pos": [
+        1060,
+        240
+      ],
+      "size": [
+        160,
+        64
+      ]
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "users · folders · files",
+      "pos": [
+        1060,
+        90
+      ],
+      "size": [
+        160,
+        64
+      ]
+    },
+    {
+      "id": "gcs",
+      "type": "cloud",
+      "label": "GCS bucket",
+      "sublabel": "private · user/folder/file",
+      "pos": [
+        790,
+        440
+      ],
+      "size": [
+        430,
+        64
+      ]
+    },
+    {
+      "id": "oauth",
+      "type": "security",
+      "label": "Google OAuth",
+      "sublabel": "ADC access tokens",
+      "pos": [
+        1300,
+        440
+      ],
+      "size": [
+        150,
+        64
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Your machine (localhost)",
+      "wraps": [
+        "caddy",
+        "web",
+        "api",
+        "auth",
+        "drive",
+        "postgres"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "signed-in session",
+      "wraps": [
+        "api",
+        "auth"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "Google Cloud project",
+      "wraps": [
+        "gcs",
+        "oauth"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "open-site",
+      "from": "browser",
+      "to": "caddy",
+      "label": "HTTP :80",
+      "variant": "emphasis"
+    },
+    {
+      "id": "proxy-web",
+      "from": "caddy",
+      "to": "web",
+      "label": "proxy :3002",
+      "variant": "emphasis"
+    },
+    {
+      "id": "proxy-api",
+      "from": "web",
+      "to": "api",
+      "label": "/api/* rewrite",
+      "variant": "emphasis"
+    },
+    {
+      "id": "call-drive",
+      "from": "api",
+      "to": "drive",
+      "label": "drive calls",
+      "variant": "emphasis"
+    },
+    {
+      "id": "check-session",
+      "from": "api",
+      "to": "auth",
+      "label": "check cookie",
+      "variant": "security"
+    },
+    {
+      "id": "session-rows",
+      "from": "auth",
+      "to": "postgres",
+      "label": "sessions"
+    },
+    {
+      "id": "metadata-sql",
+      "from": "drive",
+      "to": "postgres",
+      "label": "SQL · user lock",
+      "variant": "emphasis"
+    },
+    {
+      "id": "range-reads",
+      "from": "api",
+      "to": "gcs",
+      "label": "range reads",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "object-moves",
+      "from": "drive",
+      "to": "gcs",
+      "label": "copy · delete",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "direct-upload",
+      "from": "browser",
+      "to": "gcs",
+      "label": "resumable PUT, 8 MB chunks",
+      "fromSide": "bottom",
+      "toSide": "left",
+      "via": [
+        [
+          115,
+          472
+        ]
+      ]
+    },
+    {
+      "id": "adc-token",
+      "from": "drive",
+      "to": "oauth",
+      "label": "ADC token",
+      "variant": "security"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Primary path: open a file",
+      "items": [
+        "Browser → Caddy → Next.js → FastAPI → Drive service → PostgreSQL",
+        "Listings are database-only: opening the app reads no bytes from GCS",
+        "Bytes stream back only on open / play / download, via HTTP Range (206)"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Uploads skip the server",
+      "items": [
+        "API checks name clashes, books the file, opens a resumable session",
+        "Browser PUTs 8 MB chunks straight to GCS, 3 files at a time",
+        "API confirms the size on complete; the file becomes ready"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Bucket layout and sync",
+      "items": [
+        "{username}/{folder path}/{file name}, plus a marker per folder",
+        "Trash: _trash/{username}/{deleted at}/{original path}",
+        "Every change: database first, then server-side copy, commit, delete old"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Trust boundaries",
+      "items": [
+        "Bucket private: uniform access + public access prevention",
+        "15-min access JWT + rotating refresh, reuse detection",
+        "Every query scoped to the signed-in user; others get 404"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Operations",
+      "items": [
+        "cloud.sh runs web + API; cron at boot and every 10 min",
+        "Housekeeping: trash > 30 days, abandoned uploads",
+        "make setup · check-all · relayout · reindex"
+      ]
+    }
+  ]
+}

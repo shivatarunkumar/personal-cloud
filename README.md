@@ -3,6 +3,99 @@
 Set-up and run steps. What the project is, how it works, and the roadmap are in
 [project.md](project.md).
 
+<!-- autodocs:start -->
+## Overview
+
+Personal Cloud is a self-hosted file drive, like a small private OneDrive. The web app and its
+database run on your own machine, and every file is stored in **your own private Google Cloud
+Storage bucket**, under readable names. Each person who uses it has their own account and sees only
+their own files. It is meant for a home machine and your private network. It is not a hosted service
+and has no public sharing.
+
+- Upload files and whole folders, with a progress tray and Replace / Skip / Keep both when names clash
+- View photos, play videos (streamed as they play), read PDFs and text files, download on demand
+- Folders, rename, move, copy, search, Recent / Photos / Videos views, and a 30-day trash
+- **Nothing is fetched from the bucket when you browse.** Bytes move only when you open, play or download a file
+- Runs in the background (`./cloud.sh`), restarts itself, and can be reached at a name such as `http://mycloud.com`
+
+## Architecture
+
+![Architecture](docs/autodocs/diagrams/architecture.png)
+
+[Interactive diagram](docs/autodocs/diagrams/architecture.html) · [draw.io](docs/autodocs/diagrams/architecture.drawio)
+
+- **Browser → (Caddy) → Next.js web app → FastAPI.** The web app serves the pages and forwards `/api/*`
+  to the API on the same address, so the session cookies never cross origins (`frontend/next.config.ts:29`).
+- **FastAPI** checks the session cookie on every request. The **drive service** keeps folders, files and
+  the trash in **PostgreSQL**, scoped to the signed-in user.
+- **Uploads skip the server.** The API books the file and opens a GCS resumable session; the browser
+  sends 8 MB chunks straight to the bucket (`frontend/lib/upload.ts:47`).
+- **Downloads and playback stream through the API** with HTTP Range, so a video seeks without
+  downloading the gap (`backend/app/api/v1/files.py:165`).
+- **The bucket mirrors the drive**: `{username}/{folder}/{file}`, with trashed items under `_trash/`.
+  After every change, objects are copied to their new names inside Google and the old ones are deleted
+  only after the database commit (`backend/app/services/drive.py:170`).
+
+The design, data model and roadmap are in [project.md](project.md).
+
+## Quick start
+
+You need **Python 3.12+**, **Node 20+**, **PostgreSQL 16+**, the **gcloud CLI**, and a Google Cloud
+project with a bucket. Steps 1–7 above walk through each one; the short version is:
+
+```bash
+gcloud auth application-default login
+cp .env.example .env        # fill in DATABASE_URL, POSTGRES_ADMIN_URL, JWT_SECRET, GCP_PROJECT_ID, GCS_BUCKET
+make check && make setup    # packages, database, bucket settings, hosts entry, web build
+make check-all              # every line should say ok
+./cloud.sh start            # then open WEB_BASE_URL and create an account
+```
+
+For development, run `make api` and `make web` in two terminals instead of `./cloud.sh start`.
+
+## Configuration
+
+Settings live in `.env` (copied from `.env.example`, never committed). The main keys:
+
+| Key | Required | Default | Purpose |
+|---|---|---|---|
+| `DATABASE_URL` | yes | `postgresql+asyncpg://cloud:change-me@localhost:5432/personal_cloud` | App database; `make db-init` creates this role and database |
+| `POSTGRES_ADMIN_URL` | yes | `postgresql://postgres@localhost:5432/postgres` | A superuser, used only by `make db-init` |
+| `JWT_SECRET` | yes | *(empty: the API refuses to start)* | Signs session cookies; `openssl rand -hex 32` |
+| `GCP_PROJECT_ID` | yes | *(empty)* | The project that owns the bucket |
+| `GCS_BUCKET` | yes | *(empty)* | The bucket every file is stored in |
+| `WEB_BASE_URL` | no | `http://localhost:3002` | The address people open; also decides which origins may upload |
+| `EXTRA_ORIGINS` | no | *(empty)* | More addresses (LAN, Tailscale), comma-separated; then `make setup-gcp` |
+| `APP_NAME` | no | `Personal Cloud` | Name shown in the app |
+| `API_HOST_PORT` / `WEB_HOST_PORT` | no | `8002` / `3002` | Ports for the API and the web app |
+| `ALLOW_SIGNUP` | no | `true` | `false` turns off new accounts |
+| `GCS_PREFIX` | no | *(empty)* | Optional sub-path inside the bucket |
+| `GOOGLE_APPLICATION_CREDENTIALS` | no | *(empty: your gcloud login)* | Path to a service-account key, kept outside the repo |
+| `DEFAULT_QUOTA_BYTES` | no | *(empty: unlimited)* | Storage limit for new accounts |
+| `MAX_UPLOAD_BYTES` | no | `53687091200` (50 GiB) | Largest single file |
+| `UPLOAD_CHUNK_BYTES` | no | `8388608` (8 MiB) | Upload chunk size, a multiple of 256 KiB |
+| `TRASH_RETENTION_DAYS` | no | `30` | Trash older than this is deleted by the housekeeping run |
+| `LOG_LEVEL` / `LOG_FORMAT` | no | `INFO` / `text` | `DEBUG` traces each request; `json` for machine-read logs |
+
+Upload origins are worked out from `WEB_BASE_URL`, localhost and `EXTRA_ORIGINS`
+(`backend/app/core/config.py:94`); there are no separate CORS keys.
+
+## Usage
+
+| To | Do this | You get |
+|---|---|---|
+| Upload files | Drag them onto a folder, or **New → Upload files** | A tray with overall progress; files appear as they finish |
+| Upload a folder | Drag it onto the page, or **New → Upload folder** | The same folders in the drive and in the bucket |
+| Re-upload changed files | Upload again into the same folder | A window to Replace, Skip or Keep both; same-size files default to Skip |
+| Open or play a file | Click it | The viewer loads only that file; videos stream as they play |
+| Undo a delete | **Trash → Restore** | The item back where it was (renamed if the name is taken) |
+| Check the setup | `make check-all` | One `ok` / `FAIL` line per check, with the fix for each failure |
+| See the API | Open `http://localhost:8002/docs` | Interactive API reference (Swagger) |
+
+The other commands are listed under *Everyday commands* above. Common problems and their fixes are
+under *Troubleshooting* above.
+<!-- autodocs:end -->
+
 The steps are written for macOS with Homebrew. On Linux, install the same tools with your
 package manager.
 
